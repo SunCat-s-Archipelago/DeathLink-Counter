@@ -6,9 +6,18 @@ from CommonClient import CommonContext, ClientCommandProcessor, get_base_parser,
 
 class DeathLinkCounterCommandProcessor(ClientCommandProcessor):
     ctx: "DeathLinkCounterContext"
-
-    def _cmd_test(self):
-        self.output("Test Successful")
+    def _cmd_client_data(self):
+        """Show client data, for debugging"""
+        attr_list = [
+            "death_link_count",
+            "slot_data",
+            "scribe_index",
+            "client_index",
+            "server_anchor_time",
+            "client_anchor_time_measurement"
+        ]
+        for attr in attr_list:
+            self.output("obj.%s = %r" % (attr, getattr(self.ctx, attr)))
 
 class DeathLinkCounterContext(CommonContext):
     command_processor = DeathLinkCounterCommandProcessor
@@ -16,6 +25,12 @@ class DeathLinkCounterContext(CommonContext):
     game = "DeathLink Counter"
     items_handling = 0b000  # no item handling
     want_slot_data: bool = True
+    death_link_count = 0
+    slot_data = {}
+    scribe_index = -1
+    client_index = -1
+    server_anchor_time = 0.0
+    client_anchor_time_measurement = 0.0
 
     def __init__(self, server_address, password):
         super(DeathLinkCounterContext, self).__init__(server_address, password)
@@ -28,7 +43,9 @@ class DeathLinkCounterContext(CommonContext):
         await self.send_connect()
 
     def on_package(self, cmd: str, args: dict):
-        pass
+        if cmd == "Connected":
+            if "slot_data" in args:
+                self.slot_data = args["slot_data"]
 
 async def main(args):
     ctx = DeathLinkCounterContext(args.connect, args.password)
