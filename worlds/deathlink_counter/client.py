@@ -105,6 +105,8 @@ async def main(args):
 
 
 def launch():
+    import colorama
+
     parser = get_base_parser(description="Gameless Archipelago Client, for text interfacing.")
     parser.add_argument('--name', default=None, help="Slot Name to connect as.")
     parser.add_argument("url", nargs="?", help="Archipelago connection url")
@@ -118,7 +120,11 @@ def launch():
         if url.password:
             args.password = urllib.parse.unquote(url.password)
 
+    # use colorama to display colored text highlighting on windows
+    colorama.init()
+
     asyncio.run(main(args))
+    colorama.deinit()
 
 
 if __name__ == "__main__":
