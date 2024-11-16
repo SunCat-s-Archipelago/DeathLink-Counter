@@ -1,6 +1,7 @@
 import asyncio
 import time
 import urllib.parse
+from asyncio import Task
 from typing import Optional, Set, Dict, Any
 
 from CommonClient import CommonContext, ClientCommandProcessor, get_base_parser, gui_enabled, logger
@@ -33,6 +34,11 @@ class DeathLinkCounterContext(CommonContext):
     game = ""
     items_handling = 0b111  # item handling for client commands
     want_slot_data: bool = False
+
+    process_death_links_task: Optional[Task] = None
+    death_link_event = asyncio.Event()
+    sleep_task_for_process_death_links: Optional[Task] = None
+
     death_link_count: int = 0
     data_storage: Dict[str, Any] = {}
     client_index: Optional[int] = None
@@ -49,6 +55,10 @@ class DeathLinkCounterContext(CommonContext):
         if self.server_anchor_time is None or self.client_anchor_time_measurement is None:
             return None
         return self.server_anchor_time + time.monotonic() - self.client_anchor_time_measurement
+
+    def start_process_death_links_task(self):
+        if self.process_death_links_task is None or self.process_death_links_task.done():
+            self.process_death_links_task = asyncio.create_task(process_death_links(self))
 
     async def server_auth(self, password_requested: bool = False):
         if password_requested and not self.password:
@@ -76,7 +86,8 @@ class DeathLinkCounterContext(CommonContext):
                 logger.info(f"Killed by {killer}, because of \"{data.get('cause', '')}\"")
             else:
                 logger.info(f"Killed because of \"{data.get('cause', '')}\"")
-            logger.info(f"Death Link count: {self.death_link_count}")
+            self.death_link_event.set()
+            self.start_process_death_links_task()
             self.last_death_link_timed = self.calc_current_time()
 
     async def send_death(self, death_text: str = ""):
@@ -92,6 +103,22 @@ class DeathLinkCounterContext(CommonContext):
                 self.client_anchor_time_measurement = time_measurement
 
 
+async def process_death_links(ctx: DeathLinkCounterContext, delay=5.0):
+    while not ctx.exit_event.is_set():
+        if not ctx.death_link_event.is_set():
+            break
+        ctx.sleep_task_for_process_death_links = asyncio.create_task(asyncio.sleep(delay))
+        try:
+            await ctx.sleep_task_for_process_death_links
+        except asyncio.CancelledError:
+            raise
+        finally:
+            if not ctx.death_link_event.is_set():
+                break
+            logger.info(f"Death Link count: {ctx.death_link_count}")
+            ctx.death_link_event.clear()
+
+
 async def main(args):
     ctx = DeathLinkCounterContext(args.connect, args.password)
     ctx.auth = args.name
@@ -101,6 +128,10 @@ async def main(args):
     ctx.run_cli()
 
     await ctx.exit_event.wait()
+    if ctx.sleep_task_for_process_death_links is not None:
+        ctx.sleep_task_for_process_death_links.cancel()
+    if ctx.process_death_links_task is not None:
+        await ctx.process_death_links_task
     await ctx.shutdown()
 
 
