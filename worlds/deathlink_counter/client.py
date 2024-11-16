@@ -6,12 +6,12 @@ from CommonClient import CommonContext, ClientCommandProcessor, get_base_parser,
 
 class DeathLinkCounterCommandProcessor(ClientCommandProcessor):
     ctx: "DeathLinkCounterContext"
+
     def _cmd_client_data(self):
         """Show client data, for debugging"""
         attr_list = [
             "death_link_count",
-            "slot_data",
-            "scribe_index",
+            "data_storage",
             "client_index",
             "server_anchor_time",
             "client_anchor_time_measurement"
@@ -19,15 +19,15 @@ class DeathLinkCounterCommandProcessor(ClientCommandProcessor):
         for attr in attr_list:
             self.output("obj.%s = %r" % (attr, getattr(self.ctx, attr)))
 
+
 class DeathLinkCounterContext(CommonContext):
     command_processor = DeathLinkCounterCommandProcessor
     tags: typing.Set[str] = {"AP", "DeathLink"}
-    game = "DeathLink Counter"
-    items_handling = 0b000  # no item handling
-    want_slot_data: bool = True
+    game = ""
+    items_handling = 0b111  # item handling for client commands
+    want_slot_data: bool = False
     death_link_count = 0
-    slot_data = {}
-    scribe_index = -1
+    data_storage = {}
     client_index = -1
     server_anchor_time = 0.0
     client_anchor_time_measurement = 0.0
@@ -43,9 +43,8 @@ class DeathLinkCounterContext(CommonContext):
         await self.send_connect()
 
     def on_package(self, cmd: str, args: dict):
-        if cmd == "Connected":
-            if "slot_data" in args:
-                self.slot_data = args["slot_data"]
+        pass
+
 
 async def main(args):
     ctx = DeathLinkCounterContext(args.connect, args.password)
@@ -57,6 +56,7 @@ async def main(args):
 
     await ctx.exit_event.wait()
     await ctx.shutdown()
+
 
 def launch():
     parser = get_base_parser(description="Gameless Archipelago Client, for text interfacing.")
