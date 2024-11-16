@@ -59,7 +59,7 @@ class DeathLinkCounterContext(CommonContext):
     def on_deathlink(self, data: Dict[str, Any]) -> None:
         time_received = data.get("time", None)
         if type(time_received) is not float:
-            logger.info(
+            logger.warn(
                 f"""Received malformed death link {{ time:{
                 time_received
                 }, source:{
